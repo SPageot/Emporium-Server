@@ -18,12 +18,16 @@ const findMovieTrailer = async (videoName) => {
   return videos[0].url;
 };
 
-app.get("/movies", async (req, res) => {
+app.post("/movies", async (req, res) => {
   await axios
     .post(
-      `https://api.themoviedb.org/3/movie/now_playing?api_key=${process.env.API_KEY}&language=en-US&page=1`
+      `https://api.themoviedb.org/3/movie/${
+        req?.body?.movieType || "now_playing"
+      }?api_key=${process.env.API_KEY}&language=en-US&page=${req?.body?.page}`
     )
-    .then((response) => res.send(response?.data));
+    .then((response) => {
+      res.send(response?.data);
+    });
 });
 
 app.post("/movies/movie", async (req, res) => {
