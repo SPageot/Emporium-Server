@@ -2,12 +2,23 @@ require("dotenv").config();
 const axios = require("axios");
 const express = require("express");
 const cors = require("cors");
-const { response } = require("express");
 const app = express();
+const User = require("./loginschema");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
+
 const PORT = process.env.PORT || 3010;
 
 app.use(cors());
 app.use(express.json());
+
+mongoose
+  .connect(process.env.MONGODB_CONNECTION, { useNewUrlParser: true })
+  .then(() => {
+    console.log("connected to database");
+  })
+  .catch((err) => console.log(err));
 
 const findMovieTrailer = async (videoName) => {
   const yts = require("yt-search");
@@ -28,6 +39,34 @@ app.post("/movies", async (req, res) => {
     .then((response) => {
       res.send(response?.data);
     });
+});
+
+app.post("/login", async (req, res) => {
+  bcrypt.hash(req?.body?.password, 10, (err, hashedPass) => {
+    if (err) {
+      res.json({
+        error: err,
+      });
+    }
+
+    let user = new User({
+      email: req?.body?.email,
+      password: hashedPass,
+    });
+
+    user
+      .save()
+      .then((user) =>
+        res.json({
+          message: "User Added Successfully",
+        })
+      )
+      .catch((err) =>
+        res.json({
+          message: "An error occured",
+        })
+      );
+  });
 });
 
 app.post("/movies/movie", async (req, res) => {
