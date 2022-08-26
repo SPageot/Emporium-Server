@@ -4,9 +4,13 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const User = require("./loginschema");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
+const passwordVal = new RegExp(
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[#$@!%&*?])[A-Za-z\d#$@!%&*?]{8,30}$/
+);
+const saltRounds = 10;
 
 const PORT = process.env.PORT || 3010;
 
@@ -19,6 +23,8 @@ mongoose
     console.log("connected to database");
   })
   .catch((err) => console.log(err));
+
+const userData = mongoose.model("User");
 
 const findMovieTrailer = async (videoName) => {
   const yts = require("yt-search");
@@ -41,31 +47,62 @@ app.post("/movies", async (req, res) => {
     });
 });
 
-app.post("/login", async (req, res) => {
-  bcrypt.hash(req?.body?.password, 10, (err, hashedPass) => {
-    if (err) {
-      res.json({
-        error: err,
+app.post("/signup", (req, res) => {
+  const query = userData.where({ email: req?.body?.email });
+  query.findOne((err, user) => {
+    if (err) return console.log(err);
+    if (!user) {
+      if (req?.body?.password.match(passwordVal)) {
+        bcrypt.hash(
+          req?.body?.password,
+          saltRounds,
+          async function (err, hash) {
+            await userData.create({
+              email: req?.body?.email,
+              password: hash,
+            });
+            res.send({ status: "Signup SuccessFul" });
+            if (err) {
+              console.log(err);
+              res.send({ status: "Signup Failed" });
+            }
+          }
+        );
+      } else {
+        res.send({ status: "password invalid" });
+      }
+    } else {
+      res.send({ status: "User is already registered" });
+    }
+  });
+});
+
+app.post("/login", (req, res) => {
+  const query = userData.where({ email: req?.body?.email });
+  query.findOne((err, user) => {
+    if (err) return console.log(err);
+    const username = { name: req?.body?.email };
+    if (user) {
+      bcrypt.compare(
+        req?.body?.password,
+        user.password,
+        async function (err, result) {
+          if (result) {
+            const accessToken = jwt.sign(
+              username,
+              process.env.ACCESS_TOKEN_SECRET
+            );
+            res.send({ status: result, accessToken: accessToken });
+          } else {
+            res.send({ status: result, message: "Invalid Password" });
+          }
+        }
+      );
+    } else {
+      res.send({
+        message: "User not registered! Please Sign Up",
       });
     }
-
-    let user = new User({
-      email: req?.body?.email,
-      password: hashedPass,
-    });
-
-    user
-      .save()
-      .then((user) =>
-        res.json({
-          message: "User Added Successfully",
-        })
-      )
-      .catch((err) =>
-        res.json({
-          message: "An error occured",
-        })
-      );
   });
 });
 
